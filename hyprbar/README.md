@@ -74,6 +74,12 @@ hyprpm enable hyprbars
 hyprpm reload -n
 ```
 
+> ⚠️ **本機不是這樣跑的。** hyprpm 的 hyprbars 在這台是**停用**的，實際載入的是
+> 自己編的修補版，因為官方版在 Hyprland 0.56 上會閃爍。原因與作法見
+> [六、閃爍 Bug 與修補版](#六閃爍-bug-與修補版hyprland-056)。
+> 上面這段仍然要做過一次 —— `hyprpm update` 產生的 headers 是自行編譯的前提。
+
+
 裝完的狀態（本機實際值）：
 
 ```
@@ -114,8 +120,12 @@ require("hypr.autostart")
 標題列會無聲消失。每次 `omarchy update` 之後跑：
 
 ```bash
-./install.sh --rebuild      # 等同 hyprpm update && hyprpm reload -n
+./install.sh --rebuild                        # 等同 hyprpm update && hyprpm reload -n
+~/dev/hyprland-plugins/rebuild-hyprbars.sh    # 再重編修補版的 hyprbars
 ```
+
+第二行不能省 —— 修補版是自己編的，`hyprpm update` 不會碰它，而外掛 ABI 是
+**綁定 commit** 的，Hyprland 一升級舊的 `.so` 就拒絕載入。
 
 ---
 
@@ -312,7 +322,78 @@ grim /tmp/s.png && magick /tmp/s.png -crop 200x1+0+113 +repage txt: \
 
 ---
 
-## 六、疑難排解
+## 六、閃爍 Bug 與修補版（Hyprland 0.56）
+
+### 症狀
+
+`decoration:rounding` 非 0 **且**有模糊在跑的時候，標題列會閃爍 —— 有時整條變成
+實心色塊，有時背景直接透出來。兩者缺一就不會發生。
+
+上游 issue：**[hyprwm/hyprland-plugins#697](https://github.com/hyprwm/hyprland-plugins/issues/697)**
+（**OPEN**，回報者 thoastbrot，2026-08-12，不是我們開的）
+
+### 根因
+
+Hyprland 的模糊材質路徑 `CHyprOpenGLImpl::renderTextureWithBlur`
+（`src/render/OpenGL.cpp`）會把自己的 alpha-discard 遮罩寫進 stencil buffer，
+結尾呼叫 `glStencilMask(0x00)` 而**從未還原**。0.56 起，任何走這條路徑渲染的表面
+—— 開了 `ignore_alpha` 的模糊 layer、模糊視窗 —— 都會把 stencil 寫入遮罩留在 0，
+交給下一個渲染的東西。
+
+hyprbars 接著用這段遮住視窗圓角：
+
+```cpp
+glClearStencil(0);
+glClear(GL_STENCIL_BUFFER_BIT);
+... renderRect(windowBox) ...
+```
+
+寫入遮罩是 0 代表 stencil 寫入被完全停用，所以**這個 clear 和這次 mask draw
+都被靜默丟棄**。標題列於是拿**前一個表面的 discard 遮罩**去測試，
+`glStencilFunc(GL_NOTEQUAL, 1, -1)` 把它大部分面積拒絕掉，背景就透出來。
+
+> **為什麼是閃爍而不是一直壞：** 某一 frame 裡有沒有模糊表面排在裝飾之前渲染，
+> 取決於 damage。所以它時好時壞。
+
+### 修復
+
+在 clear 之前把寫入遮罩拿回來。`barDeco.cpp` 既有的清理區塊本來就會在之後
+還原成 `-1`，所以只要加一行：
+
+```cpp
+glStencilMask(0xFF);        // ← 加這行
+
+glClearStencil(0);
+glClear(GL_STENCIL_BUFFER_BIT);
+```
+
+### 這台機器怎麼跑的
+
+| | |
+|---|---|
+| 原始碼 | `~/dev/hyprland-plugins`，分支 `fix/hyprbars-stencil-mask`，commit `a58ab81` |
+| 建置腳本 | `~/dev/hyprland-plugins/rebuild-hyprbars.sh` |
+| 產物 | `~/.local/share/hyprbars-patched/hyprbars.so` |
+| 載入 | `autostart.lua` 的 `hyprctl plugin load ...`，**不走 hyprpm** |
+| hyprpm 的 hyprbars | **停用** —— 兩個絕不能同時載入 |
+
+那份原始碼樹**釘在 hyprpm 為當前 Hyprland 配對的 plugin commit 上**
+（見 `hyprpm.toml` 的 `commit_pins`）。`omarchy update` 升級 Hyprland 之後，
+要查出新的 pin、把這個分支 rebase 上去，再跑一次 `rebuild-hyprbars.sh`。
+
+`rebuild-hyprbars.sh` 會先 `hyprctl plugin unload` 再覆蓋 —— Hyprland 會把 `.so`
+保持 mapped，不先卸載就蓋不掉。
+
+### ⚠️ 尚未送上游
+
+`~/dev/hyprland-plugins` 的 `origin` 指向 **hyprwm 上游本身，不是 fork**，
+所以那個 commit 目前哪裡都推不出去。要送 PR 得先 `gh repo fork`。
+
+Issue #697 仍然開著，其他人也在受影響 —— 這個修復值得送出去。
+
+---
+
+## 七、疑難排解
 
 | 症狀 | 原因 / 解法 |
 |---|---|
@@ -324,6 +405,9 @@ grim /tmp/s.png && magick /tmp/s.png -crop 200x1+0+113 +repage txt: \
 | 邊框從標題列中間切過 | `bar_precedence_over_border` 沒設成 true |
 | 按鈕愈開愈多 | 不會發生 —— hyprbars 每次重載都重建按鈕清單 |
 | `hyprpm update` 編譯失敗 | 缺 build 相依，通常是 `cpio` |
+| **標題列閃爍／變成實心色塊** | 官方版的 stencil bug（#697）。要跑修補版 —— 見第六節 |
+| Hyprland 升級後標題列又開始閃 | 修補版沒重編，跑 `~/dev/hyprland-plugins/rebuild-hyprbars.sh` |
+| 標題列行為詭異、兩套並存 | hyprpm 的 hyprbars 沒停用，和修補版同時載入了 |
 
 ```bash
 hyprctl plugin list          # 外掛有沒有真的載入
