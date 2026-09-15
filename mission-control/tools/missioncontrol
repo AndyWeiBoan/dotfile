@@ -1,0 +1,75 @@
+#!/bin/bash
+# Show/hide the Quickshell Mission Control (macOS-style workspace overview).
+#
+#   missioncontrol            toggle (default)
+#   missioncontrol close      hide it if it is showing, otherwise do nothing
+#   missioncontrol daemon     start the resident process (autostart.lua)
+#
+# The overview is a DAEMON, not a per-keypress launch. Launching `qs` each time
+# cost ~340ms before anything appeared -- ~145ms of Qt/QML startup and ~190ms
+# decoding Omarchy's 5120x2880 wallpaper, neither of which can be avoided per
+# launch (a smaller sourceSize measured *slower*). Resident, a toggle is an IPC
+# call over a unix socket and shows in ~80ms.
+#
+# `close` exists so CTRL+DOWN and a swipe down can be a pure exit: a key that
+# opens the thing when it is shut is not an exit key.
+
+CONFIG="$HOME/.config/quickshell/missioncontrol"
+IPC=(qs -p "$CONFIG" ipc call overview)
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/missioncontrol.lock"
+
+# Serialise invocations. Two keypresses in quick succession could otherwise both
+# find no daemon and both start one -- and `qs -d -p` does NOT refuse when an
+# instance is already running, it cheerfully starts a second. `qs ipc` then talks
+# to the oldest instance while the other sits there invisible, which shows up as
+# the toggle intermittently "not working". Measured: 1 failure in 5 cycles.
+# -w 2: never block a keypress for longer than that. If the lock cannot be had,
+# carry on unserialised rather than doing nothing -- a duplicate instance is
+# recoverable, a dead keybinding is not.
+exec 9>"$LOCK" 2>/dev/null && flock -w 2 9 2>/dev/null
+
+# Liveness is "does an instance answer for this config", asked over the socket
+# we are about to use anyway.
+#
+# Deliberately not pgrep. The daemon's command line keeps its flags -- it is
+# `qs -d -p <config>` -- so the obvious pattern `qs -p <config>` does NOT match
+# it. An earlier version checked exactly that, concluded nothing was running,
+# and launched a second instance in the foreground on every keypress.
+alive() { "${IPC[@]}" state >/dev/null 2>&1; }
+
+start_daemon() {
+  # 9>&- matters: the daemon would otherwise INHERIT the lock file descriptor
+  # and, being long-lived, hold the flock forever -- deadlocking every later
+  # invocation, so the key silently does nothing. Found by the test hanging.
+  qs -d -p "$CONFIG" 9>&- >/dev/null 2>&1
+  # -d returns once the child reports a successful start, but its IpcHandler is
+  # registered a moment later; wait for the socket rather than racing it.
+  # Ignoring the exit status on purpose -- what matters is whether something is
+  # answering afterwards, which is what this loop actually checks.
+  for _ in $(seq 1 100); do
+    alive && return 0
+    sleep 0.05
+  done
+  return 1
+}
+
+case "$1" in
+  daemon)
+    # Nothing to put away afterwards: the config loads hidden. An earlier
+    # version loaded shown and flashed the overview across the screen at every
+    # login before this script's `hide` could land.
+    alive || start_daemon
+    ;;
+  close)
+    alive && exec "${IPC[@]}" hide
+    exit 0
+    ;;
+  *)
+    # Bring the daemon up if it is not there (autostart lost a race, or it
+    # died), then always go through with the toggle -- the config loads hidden,
+    # so a toggle on a fresh daemon opens it. Never exit without having tried
+    # the call: a transient liveness failure should not eat a keypress.
+    alive || start_daemon || exit 1
+    exec "${IPC[@]}" toggle
+    ;;
+esac
