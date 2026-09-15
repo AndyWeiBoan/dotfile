@@ -102,6 +102,11 @@ Qt.fontFamilies().indexOf("Inter") >= 0 ? "Inter" : "Noto Sans"
 
 管理工具:`~/.local/bin/omarchy-plugin-patches`(自製,2 KB)
 
+> **Spotlight 已納入版控** —— `spotlight/` 有完整模組:patch 本身、layer rule 與
+> 按鍵片段、`install.sh` / `verify.sh`,以及不依賴 patch 的 `PROMPT.md`
+> (上游改版讓 patch 貼不上去時,靠它重做)。omastats 的 patch 與 20 張貓 SVG
+> 仍未納入。
+
 備份:`.local.runcat.bak.20260910144733/`(原始 runcat,5 張 frame)
 
 ---
@@ -320,18 +325,18 @@ resolution = cursor_size × scale × base = 28 × 2 × 4 = 224
 | `~/dev/omardock` | ✅ | ✅ AndyWeiBoan/omardock | — (2026-09-15 建立並推送) |
 | `~/dev/omarcat` | ✅ | ✅ AndyWeiBoan/omarcat | — (2026-09-15 `git init` 並推送;此前**連 git repo 都不是**) |
 | `~/.config/hypr` | ❌ | ❌ | **完全沒版控** |
-| `~/.config/omarchy/plugin-patches` | ❌ | ❌ | 20 張自製貓咪 SVG + 2 個 patch,**沒版控** |
+| `~/.config/omarchy/plugin-patches` | 部分 | 部分 | Spotlight 的 patch 已在 `dotfile/spotlight/`;omastats 的 patch + 20 張貓 SVG **仍沒版控** |
 | `~/.local/share/icons/.../apps/*.svg` | ❌ | ❌ | 3 張自製圖示,**沒版控** |
-| `~/.local/bin` 自製腳本 | ❌ | ❌ | 8 支,**沒版控** |
+| `~/.local/bin` 自製腳本 | 部分 | 部分 | `omarchy-plugin-patches` 已在 `dotfile/spotlight/tools/`;其餘 7 支 **沒版控** |
 
 ---
 
 ## 9. 待辦
 
 1. `~/.config/hypr` 納入 dotfile repo(照既有 `install.sh` + `verify.sh` + `config/` 格式)
-2. `plugin-patches`(含 20 張貓 SVG)納入版控
+2. ~~`plugin-patches` 納入版控~~ —— Spotlight 已完成(`spotlight/`);**omastats 的 patch 與 20 張貓 SVG 還沒**
 3. 3 張自製 SVG 圖示納入版控
-4. `~/.local/bin` 8 支自製腳本納入版控
+4. `~/.local/bin` 自製腳本納入版控 —— `omarchy-plugin-patches` 已完成,**還有 7 支**(`higgstar-vpn`、`proxy-browser-higgstar`、`wayvnc-toggle`、`nwg-dock-guard`、`launchpad`、`missioncontrol`、`nwg-dock-guard.bak`)
 5. 把 `launchpad/` `mission-control/` 從 dotfile 目錄清掉(各自已有 repo)
 
 ### 移植到 M1 (Fedora Asahi Remix 44 / aarch64) 時

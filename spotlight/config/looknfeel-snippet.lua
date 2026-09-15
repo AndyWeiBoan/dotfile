@@ -1,0 +1,20 @@
+-- Frosted glass for the Spotlight plugin. Append to ~/.config/hypr/looknfeel.lua.
+--
+-- The blur is the COMPOSITOR's, not QML's. Spotlight draws a transparent
+-- full-screen backdrop with the card floating on it, so the layer contains two
+-- very different alphas and `ignore_alpha` has to thread between them:
+--
+--   ABOVE the backdrop's alpha  -- or the whole screen gets blurred, and the
+--                                 "no scrim" part of the macOS look is lost
+--   BELOW the card's own alpha  -- glassBackground is 0.45 in Spotlight.qml;
+--                                 go above it and Hyprland decides the surface
+--                                 is too transparent to be worth blurring, and
+--                                 the glass disappears entirely rather than
+--                                 getting more transparent
+--
+-- 0.25 sits in the middle of that window. If you change `glassBackground`,
+-- re-check this number.
+--
+-- This also needs blur enabled globally (`decoration.blur.enabled = true`).
+-- A per-layer rule does nothing on its own -- and Omarchy ships blur OFF.
+hl.layer_rule({ match = { namespace = "omarchy-spotlight" }, blur = true, ignore_alpha = 0.25 })

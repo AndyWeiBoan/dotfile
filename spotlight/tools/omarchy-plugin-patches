@@ -1,0 +1,66 @@
+#!/bin/bash
+# Re-apply local edits to third-party Omarchy shell plugins.
+#
+# `omarchy plugin update` pulls upstream over the plugin's working tree and
+# throws away anything edited locally. Two things are restored per plugin:
+#
+#   ~/.config/omarchy/plugin-patches/<plugin-id>.patch        edits to tracked files
+#   ~/.config/omarchy/plugin-patches/<plugin-id>.files/...    whole new files
+#
+# The .files tree exists because `git diff` only sees tracked files -- new ones
+# added to a plugin (e.g. OmaStats' ui/RunCat.qml and its cat frames) would not
+# survive a reinstall otherwise. It is copied in before the patch is applied.
+#
+# Run this after `omarchy plugin update`. It is safe to run repeatedly --
+# already-applied patches are skipped.
+#
+# To record new edits for a plugin, edit its files then:
+#   cd ~/.config/omarchy/plugins/<id> && git diff > ~/.config/omarchy/plugin-patches/<id>.patch
+# and copy any brand-new files into ~/.config/omarchy/plugin-patches/<id>.files/
+
+set -uo pipefail
+
+PATCH_DIR="$HOME/.config/omarchy/plugin-patches"
+PLUGIN_DIR="$HOME/.config/omarchy/plugins"
+
+[ -d "$PATCH_DIR" ] || { echo "No patch directory at $PATCH_DIR" >&2; exit 1; }
+
+applied=0
+failed=0
+
+shopt -s nullglob
+for patch in "$PATCH_DIR"/*.patch; do
+  id=$(basename "$patch" .patch)
+  plugin="$PLUGIN_DIR/$id"
+
+  if [ ! -d "$plugin" ]; then
+    echo "skip   $id  (not installed)"
+    continue
+  fi
+
+  # Restore any added-whole files first; the patch may reference them.
+  extras="$PATCH_DIR/$id.files"
+  if [ -d "$extras" ]; then
+    cp -a "$extras/." "$plugin/"
+  fi
+
+  if git -C "$plugin" apply --reverse --check "$patch" >/dev/null 2>&1; then
+    echo "ok     $id  (already applied)"
+    continue
+  fi
+
+  if git -C "$plugin" apply "$patch" 2>/dev/null; then
+    echo "patch  $id"
+    applied=$((applied + 1))
+  else
+    echo "FAILED $id  -- upstream moved; re-make the patch by hand" >&2
+    failed=$((failed + 1))
+  fi
+done
+
+if [ "$applied" -gt 0 ]; then
+  echo "Restarting the shell..."
+  omarchy restart shell
+fi
+
+exit $(( failed > 0 ? 1 : 0 ))

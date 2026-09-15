@@ -1,0 +1,174 @@
+diff --git i/Spotlight.qml w/Spotlight.qml
+index 2cf7b36..c0234fe 100644
+--- i/Spotlight.qml
++++ w/Spotlight.qml
+@@ -158,14 +158,21 @@ Item {
+   // Frosted glass needs something left to frost: at 0.86 the card is opaque
+   // and Hyprland's blur has no visible effect. 0.62 keeps text contrast while
+   // letting the blurred wallpaper through as colour and shape.
+-  readonly property color glassBackground: Util.alpha(Color.menu.background, 0.62)
++  readonly property color glassBackground: Util.alpha(Color.menu.background, 0.45)
+   readonly property color glassBorder: Util.alpha(Color.foreground, 0.16)
+   readonly property color glassSheen: Util.alpha("#ffffff", 0.07)
+-  readonly property color scrim: Util.alpha(Color.menu.scrim, 0.25)
+-  readonly property color selectedBackground: Util.alpha(Color.foreground, 0.12)
+-  readonly property color selectedText: Color.menu.selectedText
++  // LOCAL EDIT: fully transparent. macOS Spotlight does not dim the desktop
++  // behind it -- the pill just floats over an untouched screen.
++  readonly property color scrim: "transparent"
++  // LOCAL EDIT (macOS Spotlight look): Apple fills the selected row with a
++  // solid accent, not a faint grey wash.
++  readonly property color selectedBackground: Util.alpha(Color.accent, 0.85)
++  readonly property color selectedText: "#ffffff"
+   readonly property color dividerColor: Util.alpha(Color.foreground, 0.10)
+-  readonly property string fontFamily: Style.font.menuFamily
++  // LOCAL EDIT: Style.font.menuFamily is the system font, which here is Comic
++  // Code -- a monospace. Spotlight is set in SF Pro; Inter is its closest free
++  // match. Falls back to Noto Sans when inter-font is not installed.
++  readonly property string fontFamily: Qt.fontFamilies().indexOf("Inter") >= 0 ? "Inter" : "Noto Sans"
+ 
+   // One left rail at `gutter`. The search glyph, every row icon and every
+   // section header align to it; a row is inset by `listPadding` and carries
+@@ -174,9 +181,11 @@ Item {
+   readonly property int listPadding: Style.space(10)
+   readonly property int rowInset: gutter - listPadding
+ 
+-  readonly property int cardRadius: Style.space(12)
+-  readonly property int rowRadius: Style.space(8)
+-  readonly property int searchHeight: Style.space(56)
++  // LOCAL EDIT (macOS Spotlight look): rounder card; the search band is kept
++  // compact -- Apple's pill is short, not a hero banner.
++  readonly property int cardRadius: Style.space(20)
++  readonly property int rowRadius: Style.space(10)
++  readonly property int searchHeight: Style.space(50)
+   readonly property int rowHeight: Style.space(40)
+   readonly property int sectionHeight: Style.space(30)
+   readonly property int footerHeight: Style.space(36)
+@@ -185,7 +194,8 @@ Item {
+ 
+   // Between heading (16) and display (24): a hero input that is still an
+   // input. Scales with the user's font size rather than being pinned to 18px.
+-  readonly property int searchFontSize: Math.round(Style.font.baseSize * 1.5)
++  // LOCAL EDIT: 1.35, sized to the shorter search band above.
++  readonly property int searchFontSize: Math.round(Style.font.baseSize * 1.35)
+ 
+   // Fixing the top edge at the position the *fully expanded* panel would need
+   // to sit centred means the panel grows downward into the middle of the
+@@ -769,6 +779,16 @@ Item {
+   function rebuild() {
+     var q = String(root.query || "").trim()
+ 
++    // LOCAL EDIT (macOS Spotlight look): an empty query lists nothing, so the
++    // panel opens as a bare pill and only unfolds once you actually type.
++    // Upstream shows the frecency-ranked app list straight away.
++    if (q.length === 0) {
++      root.rows = []
++      displayModel.clear()
++      root.selectedIndex = 0
++      return
++    }
++
+     var next = []
+     function push(list) { for (var i = 0; i < list.length; i++) next.push(list[i]) }
+ 
+@@ -1399,18 +1419,29 @@ Item {
+       readonly property int listHeight: Math.min(root.maxListHeight, root.contentHeight)
+       readonly property bool hasResults: displayModel.count > 0
+ 
+-      width: Math.min(Style.space(750), panel.width - Style.space(48))
++      // LOCAL EDIT: narrower again -- on screen Apple's pill is roughly a third
++      // of the display, nothing like the 750 upstream ships.
++      width: Math.min(Style.space(560), panel.width - Style.space(48))
++      // LOCAL EDIT: the footer only exists once there is a result to act on, so
++      // an empty query leaves nothing but the search band -- a bare pill.
+       height: root.searchHeight
+         + (hasResults ? root.hairline + root.listPadding * 2 + listHeight : 0)
+-        + root.hairline + root.footerHeight
++        + (hasResults ? root.hairline + root.footerHeight : 0)
+       // Centred at whatever height it currently is, not just when full. The
+       // height Behavior below drives y with it, so the panel grows and
+       // shrinks symmetrically about the middle of the screen instead of
+       // sitting high whenever a query returns only a few rows.
++      // LOCAL EDIT: macOS puts Spotlight in the upper part of the screen, not
++      // dead centre. The top edge is pinned at a fixed fraction of the display
++      // so the pill does not creep upward as the result list grows -- it opens
++      // where it opens and unfolds downward from there.
+       anchors.horizontalCenter: parent.horizontalCenter
+-      anchors.verticalCenter: parent.verticalCenter
++      y: Math.round(panel.height * 0.22)
+ 
+-      radius: root.cardRadius
++      // LOCAL EDIT: collapsed, the ends are fully round -- the pill shape the
++      // current macOS Spotlight opens as. It squares off to cardRadius as the
++      // list expands, and the Behavior morphs between the two.
++      radius: hasResults ? root.cardRadius : height / 2
+       color: root.glassBackground
+       border.width: root.hairline
+       border.color: root.glassBorder
+@@ -1420,6 +1451,10 @@ Item {
+         NumberAnimation { duration: 110; easing.type: Easing.OutCubic }
+       }
+ 
++      Behavior on radius {
++        NumberAnimation { duration: 110; easing.type: Easing.OutCubic }
++      }
++
+       // Swallow clicks so they don't reach the dismiss MouseArea behind.
+       MouseArea { anchors.fill: parent; onClicked: {} }
+ 
+@@ -1443,8 +1478,9 @@ Item {
+           id: searchGlyph
+           text: "󰍉"
+           textFormat: Text.PlainText
+-          color: root.foreground
+-          opacity: 0.5
++          // LOCAL EDIT: white, so the magnifier sits with the placeholder.
++          color: "#ffffff"
++          opacity: 0.7
+           font.family: root.fontFamily
+           font.pixelSize: root.searchFontSize
+           anchors.left: parent.left
+@@ -1460,9 +1496,10 @@ Item {
+           anchors.rightMargin: root.gutter
+           anchors.verticalCenter: parent.verticalCenter
+ 
+-          color: root.foreground
++          // LOCAL EDIT: white, to match the placeholder it replaces as you type.
++          color: "#ffffff"
+           selectionColor: Util.alpha(root.accent, 0.35)
+-          selectedTextColor: root.foreground
++          selectedTextColor: "#ffffff"
+           font.family: root.fontFamily
+           font.pixelSize: root.searchFontSize
+           // A query is a line someone typed, and every provider fans out from
+@@ -1482,8 +1519,10 @@ Item {
+             visible: input.text.length === 0
+             text: "Search for apps and commands…"
+             textFormat: Text.PlainText
+-            color: root.foreground
+-            opacity: 0.38
++            // LOCAL EDIT: white, and much less faded. root.foreground at 0.38
++            // was washing out against the frosted card.
++            color: "#ffffff"
++            opacity: 0.75
+             font.family: input.font.family
+             font.pixelSize: input.font.pixelSize
+             verticalAlignment: Text.AlignVCenter
+@@ -1725,7 +1764,9 @@ Item {
+       }
+ 
+       // ------------------------------------------------------- footer
++      // LOCAL EDIT: hidden while collapsed, so the empty state is just the pill.
+       Rectangle {
++        visible: card.hasResults
+         anchors { bottom: footer.top; left: parent.left; right: parent.right }
+         anchors.leftMargin: root.hairline
+         anchors.rightMargin: root.hairline
+@@ -1735,6 +1776,7 @@ Item {
+ 
+       Item {
+         id: footer
++        visible: card.hasResults
+         anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
+         anchors.bottomMargin: root.hairline
+         height: root.footerHeight
