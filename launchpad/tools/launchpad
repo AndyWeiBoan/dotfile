@@ -1,0 +1,52 @@
+#!/bin/bash
+# Show/hide the Quickshell Launchpad (macOS-style app grid).
+#
+#   launchpad            toggle (default)
+#   launchpad close      hide it if it is showing, otherwise do nothing
+#   launchpad daemon     start the resident process (autostart.lua)
+#
+# The Launchpad is a DAEMON, not a per-keypress launch. Launching `qs` each time
+# took ~340ms before anything appeared -- ~145ms of Qt/QML startup and ~190ms
+# decoding the 5120x2880 wallpaper, neither avoidable per launch. Resident, a
+# toggle is an IPC call over a unix socket.
+
+CONFIG="$HOME/.config/quickshell/launchpad"
+IPC=(qs -p "$CONFIG" ipc call launchpad)
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/launchpad.lock"
+
+# Serialise invocations: two quick keypresses could otherwise both find no
+# daemon and both start one, and `qs -d -p` does NOT refuse when an instance is
+# already running -- it starts a second, after which `qs ipc` talks to the
+# oldest while the other sits there invisible. -w 2 so a stuck lock can never
+# wedge the keybinding; carrying on unserialised is the lesser evil.
+exec 9>"$LOCK" 2>/dev/null && flock -w 2 9 2>/dev/null
+
+# Liveness asked over the socket we are about to use, not pgrep: the daemon's
+# command line keeps its flags (`qs -d -p <config>`), so a `qs -p <config>`
+# pattern does not match it.
+alive() { "${IPC[@]}" state >/dev/null 2>&1; }
+
+start_daemon() {
+  # 9>&- or the daemon inherits the lock fd and, being long-lived, holds the
+  # flock forever -- deadlocking every later invocation.
+  qs -d -p "$CONFIG" 9>&- >/dev/null 2>&1
+  for _ in $(seq 1 100); do
+    alive && return 0
+    sleep 0.05
+  done
+  return 1
+}
+
+case "$1" in
+  daemon)
+    alive || start_daemon
+    ;;
+  close)
+    alive && exec "${IPC[@]}" hide
+    exit 0
+    ;;
+  *)
+    alive || start_daemon || exit 1
+    exec "${IPC[@]}" toggle
+    ;;
+esac
