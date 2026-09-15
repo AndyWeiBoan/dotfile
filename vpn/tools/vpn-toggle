@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# One-key connect/disconnect for an openfortivpn (Fortinet SSL VPN) profile.
+#
+#   vpn-toggle [profile]
+#
+# `profile` names ~/.config/openfortivpn/<profile>.conf and defaults to
+# $OPENFORTIVPN_PROFILE, then to "work".
+#
+# Runs interactively and on purpose: sudo asks for the login password, then
+# openfortivpn asks for the VPN password and the FortiToken 2FA code. Three
+# prompts in sequence, which is why the .desktop entry opens it in a terminal
+# rather than running it detached.
+
+PROFILE="${1:-${OPENFORTIVPN_PROFILE:-work}}"
+CONF="$HOME/.config/openfortivpn/$PROFILE.conf"
+
+pause() { read -n1 -rsp $'\nPress any key to close...'; echo; }
+
+# pgrep is not scoped to the profile: openfortivpn does not put the config name
+# in its argv in a form worth parsing, and running two tunnels at once is not a
+# thing we do. If that ever changes, this disconnects the wrong one.
+if pgrep -x openfortivpn >/dev/null; then
+    echo "VPN is up — disconnecting..."
+    sudo pkill -INT -x openfortivpn
+    sleep 1
+    echo "Disconnected."
+    pause
+    exit 0
+fi
+
+if ! command -v openfortivpn >/dev/null; then
+    echo "openfortivpn is not installed. Run:  omarchy pkg add openfortivpn"
+    pause
+    exit 1
+fi
+
+if [ ! -f "$CONF" ]; then
+    echo "No profile at $CONF"
+    echo "Copy config/profile.conf.example there and fill it in."
+    pause
+    exit 1
+fi
+
+# A profile holds the gateway host and your username. Refuse to hand it to
+# openfortivpn while the rest of the machine can read it.
+perms=$(stat -c %a "$CONF")
+if [ "$perms" != "600" ]; then
+    echo "!! $CONF is mode $perms — it holds the gateway host and your username."
+    echo "   Fix it:  chmod 600 $CONF"
+    echo
+fi
+
+echo "Connecting to the '$PROFILE' VPN..."
+echo "(login password for sudo, then VPN password, then 2FA token)"
+echo
+sudo openfortivpn -c "$CONF"
+
+echo
+echo "openfortivpn exited."
+pause

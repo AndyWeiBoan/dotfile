@@ -1,0 +1,29 @@
+# openfortivpn profile.  Install to ~/.config/openfortivpn/<profile>.conf
+# and chmod 600 -- this file names your gateway and your account.
+#
+#   sudo openfortivpn -c ~/.config/openfortivpn/<profile>.conf
+#
+# It will prompt for the password, then the FortiToken 2FA code. Do NOT put a
+# `password = ` line here: openfortivpn supports it, but it would put your
+# account password in a plain file, and 2FA still prompts anyway.
+
+host = vpn.example.com
+port = 443
+username = your.name
+
+# trusted-cert pins the gateway's LEAF certificate by SHA256.
+#
+# Why this is usually needed: many Fortinet gateways are configured to send
+# only their own certificate and not the intermediate CA, so the chain is
+# incomplete and ordinary CA validation fails no matter how legitimate the
+# gateway is.
+#
+# How to get the digest: run openfortivpn WITHOUT this line. It refuses to
+# connect and prints the digest it saw. Verify that value out of band -- ask
+# whoever runs the gateway, or compare it from a machine you already trust --
+# and only then paste it here. Pasting whatever a failed connection printed
+# without checking is trusting whoever is in the middle.
+#
+# If the gateway's certificate is renewed, this breaks by design and prints a
+# new digest. That is the feature working, not a bug. Verify again.
+trusted-cert = 0000000000000000000000000000000000000000000000000000000000000000

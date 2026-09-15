@@ -161,9 +161,9 @@ Qt.fontFamilies().indexOf("Inter") >= 0 ? "Inter" : "Noto Sans"
 |---|---|
 | **Claude Code** | `setsid uwsm-app -- xdg-terminal-exec --app-id=org.omarchy.agent --dir=/home/andy/Work -e claude --permission-mode auto` |
 | **Claude Code URL Handler** | `~/.local/bin/claude --handle-uri %u` |
-| **Higgstar VPN** | `foot -T higgstar-vpn -e ~/.local/bin/higgstar-vpn` (openfortivpn) |
-| **Proxy Browser (higgstar)** | `foot -T proxy-browser-higgstar -e ~/.local/bin/proxy-browser-higgstar` |
-| **VNC — Mac (172.16.64.129)** | `remmina -c ~/.local/share/remmina/mac-higgstar.remmina` |
+| **Work VPN** | `foot -T work-vpn -e ~/.local/bin/work-vpn` (openfortivpn) |
+| **Proxy Browser (work)** | `foot -T proxy-browser-work -e ~/.local/bin/proxy-browser-work` |
+| **VNC — Mac (<internal IP>)** | `remmina -c ~/.local/share/remmina/mac-work.remmina` |
 | **VNC Server (wayvnc)** | `~/.local/bin/wayvnc-toggle` |
 | **Launchpad** | `omarchy-shell shell toggle io.github.andyweiboan.launchpad "{}"` |
 
@@ -180,12 +180,12 @@ chromium · foot · imv (圖片) · mpv (影片) · flea (檔案管理) · omaca
 | 腳本 | 大小 | 用途 |
 |---|---|---|
 | `nwg-dock-guard` | 2.9 KB | **守護 nwg-dock**。nwg-dock-hyprland 在螢幕底緣建 1px hotspot layer 讓 dock 滑出;接上/拔掉螢幕或 Hyprland reload 後 hotspot 會消失而不重建 —— process 還活著但 dock 打不開。這支監看 Hyprland event socket,偵測到 hotspot 不見就重啟 dock |
-| `proxy-browser-higgstar` | 3.2 KB | 公司 proxy 瀏覽器 |
+| `proxy-browser-work` | 3.2 KB | 公司 proxy 瀏覽器 |
 | `missioncontrol` | 3.4 KB | Mission Control 啟動器 |
 | `omarchy-plugin-patches` | 2.1 KB | plugin patch 套用工具 |
 | `launchpad` | 1.8 KB | Launchpad 啟動器 |
 | `wayvnc-toggle` | 1.4 KB | VNC server 開關 |
-| `higgstar-vpn` | 886 B | openfortivpn 連線 |
+| `work-vpn` | 886 B | openfortivpn 連線 |
 | `nwg-dock-guard.bak` | 2.4 KB | 舊版備份 |
 
 ### mise wrapper(統一格式,111–154 B)
@@ -336,7 +336,7 @@ resolution = cursor_size × scale × base = 28 × 2 × 4 = 224
 1. `~/.config/hypr` 納入 dotfile repo(照既有 `install.sh` + `verify.sh` + `config/` 格式)
 2. ~~`plugin-patches` 納入版控~~ —— Spotlight 已完成(`spotlight/`);**omastats 的 patch 與 20 張貓 SVG 還沒**
 3. 3 張自製 SVG 圖示納入版控
-4. `~/.local/bin` 自製腳本納入版控 —— `omarchy-plugin-patches` 已完成,**還有 7 支**(`higgstar-vpn`、`proxy-browser-higgstar`、`wayvnc-toggle`、`nwg-dock-guard`、`launchpad`、`missioncontrol`、`nwg-dock-guard.bak`)
+4. `~/.local/bin` 自製腳本納入版控 —— `omarchy-plugin-patches` 已完成,**還有 7 支**(`work-vpn`、`proxy-browser-work`、`wayvnc-toggle`、`nwg-dock-guard`、`launchpad`、`missioncontrol`、`nwg-dock-guard.bak`)
 5. 把 `launchpad/` `mission-control/` 從 dotfile 目錄清掉(各自已有 repo)
 
 ### 移植到 M1 (Fedora Asahi Remix 44 / aarch64) 時

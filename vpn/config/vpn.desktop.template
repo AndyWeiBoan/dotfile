@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=@NAME@
+GenericName=VPN
+Comment=Connect or disconnect the @PROFILE@ SSL VPN
+Icon=forticlient
+Exec=foot -T @PROFILE@-vpn -e @BIN@ @PROFILE@
+Terminal=false
+Categories=Network;
+Keywords=vpn;forti;fortinet;openfortivpn;@PROFILE@;
+StartupNotify=false
